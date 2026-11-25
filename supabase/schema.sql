@@ -76,3 +76,7 @@ drop policy if exists "users read own orders" on public.payment_orders;
 drop policy if exists "users read own subscription" on public.subscriptions;
 create policy "users read own orders" on public.payment_orders for select using (auth.uid() = user_id);
 create policy "users read own subscription" on public.subscriptions for select using (auth.uid() = user_id);
+
+-- Keep the payment-activation RPC private to trusted server code.
+revoke all on function public.activate_v_analysis_payment(text, text, numeric, text) from public, anon, authenticated;
+grant execute on function public.activate_v_analysis_payment(text, text, numeric, text) to service_role;
