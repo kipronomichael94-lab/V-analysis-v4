@@ -10,28 +10,42 @@ module.exports = async (req, res) => {
     if (!trackingId || !reference) return res.status(400).send("Missing transaction identifiers");
     const rows = await db.request("/rest/v1/payment_orders?merchant_reference=eq." + encodeURIComponent(reference) + "&select=*");
     if (!rows || !rows.length) return res.status(404).send("Order not found");
+    const order = rows[0];
+    if (order.pesapal_tracking_id && order.pesapal_tracking_id !== trackingId) {
+      return res.status(409).send("Tracking ID mismatch");
+    }
     const payment = await api("/api/Transactions/GetTransactionStatus?orderTrackingId=" + encodeURIComponent(trackingId), { method: "GET" });
+    if (payment.merchant_reference && payment.merchant_reference !== reference) {
+      return res.status(409).send("Merchant reference mismatch");
+    }
     const state = String(payment.payment_status_description || payment.status || "").toUpperCase();
-    const completed = state === "COMPLETED";
-    const failed = state === "FAILED" || state === "INVALID";
-    await db.request("/rest/v1/payment_orders?merchant_reference=eq." + encodeURIComponent(reference), {
-      method: "PATCH",
-      headers: { Prefer: "return=minimal" },
-      body: JSON.stringify({ status: completed ? "COMPLETED" : failed ? "FAILED" : "PENDING", pesapal_tracking_id: trackingId })
-    });
-    if (completed) {
-      const now = new Date();
-      const expiry = new Date(now);
-      expiry.setMonth(expiry.getMonth() + 1);
-      await db.request("/rest/v1/subscriptions?user_id=eq." + encodeURIComponent(rows[0].user_id), {
+    if (state === "COMPLETED") {
+      const amount = Number(payment.amount);
+      const currency = String(payment.currency || "").toUpperCase();
+      if (!Number.isFinite(amount) || !currency) return res.status(409).send("Verified payment details are incomplete");
+      await db.request("/rest/v1/rpc/activate_v_analysis_payment", {
         method: "POST",
-        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-        body: JSON.stringify({ user_id: rows[0].user_id, plan: "monthly", status: "active", starts_at: now.toISOString(), expires_at: expiry.toISOString(), updated_at: now.toISOString() })
+        body: JSON.stringify({ p_reference: reference, p_tracking_id: trackingId, p_amount: amount, p_currency: currency })
+      });
+    } else if (state === "FAILED" || state === "INVALID") {
+      await db.request("/rest/v1/payment_orders?merchant_reference=eq." + encodeURIComponent(reference) + "&status=neq.COMPLETED", {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ status: "FAILED", pesapal_tracking_id: trackingId })
+      });
+    } else if (state === "REVERSED") {
+      await db.request("/rest/v1/payment_orders?merchant_reference=eq." + encodeURIComponent(reference), {
+        method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ status: "REVERSED" })
+      });
+      await db.request("/rest/v1/subscriptions?user_id=eq." + encodeURIComponent(order.user_id), {
+        method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ status: "cancelled", updated_at: new Date().toISOString() })
       });
     }
-    return res.status(200).send("OK");
+    return res.status(200).json({ orderNotificationType: q.OrderNotificationType || "IPNCHANGE", orderTrackingId: trackingId, orderMerchantReference: reference, status: 200 });
   } catch (error) {
     console.error("Pesapal IPN error:", error.message);
-    return res.status(500).send("Notification processing failed");
+    return res.status(500).json({ status: 500, message: "Notification processing failed" });
   }
 };
