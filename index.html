@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#090d18">
+<meta name="description" content="V Analysis V4 — live Deriv tick monitoring, digit statistics and transparent next-digit estimates.">
+<title>V Analysis V4</title>
+<style>
+:root{color-scheme:dark;--bg:#090d18;--panel:#111827;--panel2:#172235;--line:#26354c;--muted:#9aabc2;--text:#edf4ff;--green:#28d69a;--red:#ff6b78;--blue:#65a8ff;--gold:#f5c66a}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 15% 0%,#142540 0,transparent 45%),var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:1180px;margin:auto;padding:22px}.top{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:20px}.brand{display:flex;align-items:center;gap:12px}.logo{width:43px;height:43px;border-radius:14px;background:linear-gradient(135deg,#1fd39a,#1686a8);display:grid;place-items:center;font-weight:900;color:#04131b;font-size:21px}.brand h1{font-size:21px;margin:0}.sub{color:var(--muted);font-size:12px}.status{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--line);border-radius:30px;color:var(--muted);font-size:13px}.dot{width:8px;height:8px;border-radius:50%;background:#77859a}.dot.on{background:var(--green);box-shadow:0 0 10px var(--green)}.dot.err{background:var(--red)}
+.panel{background:linear-gradient(145deg,rgba(21,32,51,.97),rgba(13,21,35,.97));border:1px solid var(--line);border-radius:17px;padding:17px;box-shadow:0 12px 30px #0002}.controls{display:grid;grid-template-columns:1.2fr 1fr auto auto;gap:12px;align-items:end;margin-bottom:16px}.field label{display:block;color:var(--muted);font-size:12px;margin:0 0 6px}.field input,.field select{width:100%;background:#0b1423;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:11px;font:inherit;min-height:43px}.btn{border:0;border-radius:10px;padding:11px 17px;font-weight:700;cursor:pointer;min-height:43px}.primary{background:var(--green);color:#062019}.secondary{background:#263750;color:var(--text);border:1px solid #3a4b64}.btn:disabled{opacity:.45;cursor:not-allowed}.notice{font-size:12px;color:var(--muted);margin:0 0 16px}.notice strong{color:var(--gold)}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}.metric .k{color:var(--muted);font-size:12px}.metric .v{font-size:25px;font-weight:750;margin-top:3px}.metric .small{font-size:11px;color:var(--muted)}.main-grid{display:grid;grid-template-columns:1.25fr .75fr;gap:14px}.section-title{display:flex;justify-content:space-between;gap:10px;align-items:center;margin:0 0 14px;font-size:15px}.tag{font-size:11px;color:var(--blue);background:#1c3451;padding:4px 8px;border-radius:20px}.digits{display:grid;grid-template-columns:repeat(10,1fr);gap:7px}.digit{background:#0b1423;border:1px solid var(--line);border-radius:10px;text-align:center;padding:9px 2px}.digit b{display:block;font-size:18px}.digit span{font-size:11px;color:var(--muted)}.bar{height:5px;background:#24354c;border-radius:10px;margin-top:7px;overflow:hidden}.bar i{display:block;height:100%;background:linear-gradient(90deg,#208fbb,var(--green));width:0}.prediction{display:flex;align-items:center;gap:14px}.hero-digit{width:76px;height:76px;display:grid;place-items:center;border-radius:18px;background:#0b2630;border:1px solid #176b60;color:var(--green);font-size:38px;font-weight:850}.pred-copy strong{font-size:18px}.pred-copy p{margin:4px 0;color:var(--muted);font-size:12px}.confidence{margin-top:14px}.confidence-line{height:8px;background:#26354c;border-radius:20px;overflow:hidden}.confidence-line i{display:block;height:100%;background:var(--green);width:0}.muted{color:var(--muted)}.table-wrap{overflow:auto;max-height:330px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{text-align:left;padding:9px 7px;border-bottom:1px solid #233148;white-space:nowrap}th{color:var(--muted);font-weight:600;position:sticky;top:0;background:#121e30}.digit-pill{display:inline-grid;place-items:center;width:25px;height:25px;border-radius:8px;background:#20334b;font-weight:700}.hit{color:var(--green)}.miss{color:var(--red)}.foot{margin:18px 2px 4px;color:var(--muted);font-size:11px}.empty{color:var(--muted);text-align:center;padding:28px 8px}.split{display:flex;justify-content:space-between;gap:10px;align-items:center}.history-digits{display:flex;flex-wrap:wrap;gap:5px}.history-digits span{width:25px;height:27px;display:grid;place-items:center;background:#20334b;border-radius:7px;font-size:12px}.history-digits span.latest{background:#126b59;color:white}.warning{color:var(--gold)}@media(max-width:800px){.controls{grid-template-columns:1fr 1fr}.main-grid{grid-template-columns:1fr}.grid{grid-template-columns:repeat(2,1fr)}.digits{grid-template-columns:repeat(5,1fr)}}@media(max-width:430px){.wrap{padding:13px}.controls{grid-template-columns:1fr 1fr}.controls .field:first-child{grid-column:1/-1}.btn{padding:10px}.metric .v{font-size:22px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+ <div class="brand"><div class="logo">V</div><div><h1>V Analysis <span style="color:var(--green)">V4</span></h1><div class="sub">DERIV LIVE DIGIT INTELLIGENCE</div></div></div>
+ <div class="status"><i class="dot" id="dot"></i><span id="status">Disconnected</span></div>
+</header>
+<section class="panel controls">
+ <div class="field"><label for="symbol">Deriv market</label><select id="symbol"><option value="R_10">Volatility 10 Index</option><option value="R_25">Volatility 25 Index</option><option value="R_50">Volatility 50 Index</option><option value="R_75">Volatility 75 Index</option><option value="R_100">Volatility 100 Index</option><option value="1HZ10V">Volatility 10 (1s) Index</option><option value="1HZ25V">Volatility 25 (1s) Index</option><option value="1HZ50V">Volatility 50 (1s) Index</option><option value="1HZ75V">Volatility 75 (1s) Index</option><option value="1HZ100V">Volatility 100 (1s) Index</option></select></div>
+ <div class="field"><label for="appid">Deriv App ID</label><input id="appid" inputmode="numeric" value="1089" placeholder="Your app ID"></div>
+ <button class="btn primary" id="connect">Connect live</button><button class="btn secondary" id="reset">Reset stats</button>
+</section>
+<p class="notice"><strong>Public market data only:</strong> no trading account token is requested. You can use your own registered Deriv application ID. Never enter your password or API token here.</p>
+<section class="grid">
+ <div class="panel metric"><div class="k">Ticks collected</div><div class="v" id="ticks">0</div><div class="small">Current session</div></div>
+ <div class="panel metric"><div class="k">Last digit</div><div class="v" id="last">—</div><div class="small" id="quote">Waiting for tick</div></div>
+ <div class="panel metric"><div class="k">Live prediction score</div><div class="v" id="accuracy">—</div><div class="small" id="scoreNote">Needs evaluated predictions</div></div>
+ <div class="panel metric"><div class="k">Prediction samples</div><div class="v" id="samples">0</div><div class="small">Live next-tick outcomes</div></div>
+</section>
+<div class="main-grid">
+ <div class="panel">
+  <h2 class="section-title">Digit distribution <span class="tag">Rolling sample</span></h2>
+  <div class="digits" id="distribution"></div>
+  <div style="margin-top:19px"><div class="split"><h2 class="section-title" style="margin:0">Recent last digits</h2><span class="muted" id="windowLabel">Last 100</span></div><div class="history-digits" id="recent" style="margin-top:11px"><span class="muted">No ticks yet</span></div></div>
+ </div>
+ <div class="panel">
+  <h2 class="section-title">Next digit estimate <span class="tag">Statistical model</span></h2>
+  <div class="prediction"><div class="hero-digit" id="predDigit">—</div><div class="pred-copy"><strong id="predTitle">Waiting for data</strong><p id="predDetail">Connect to Deriv to begin analysis.</p></div></div>
+  <div class="confidence"><div class="split"><span class="muted">Estimated probability</span><b id="predProb">—</b></div><div class="confidence-line"><i id="predBar"></i></div></div>
+  <p class="foot">Model blends smoothed recent digit frequency with the observed transition pattern from the previous digit. It is an estimate, not a guarantee.</p>
+ </div>
+</div>
+<div class="main-grid" style="margin-top:14px">
+ <div class="panel"><h2 class="section-title">Digit frequency table</h2><div class="table-wrap"><table><thead><tr><th>Digit</th><th>Count</th><th>Frequency</th><th>Transition estimate</th></tr></thead><tbody id="freqTable"><tr><td colspan="4" class="empty">Waiting for ticks</td></tr></tbody></table></div></div>
+ <div class="panel"><h2 class="section-title">Live tick log <span class="tag">Newest first</span></h2><div class="table-wrap"><table><thead><tr><th>Time</th><th>Quote</th><th>Digit</th><th>Prediction</th><th>Result</th></tr></thead><tbody id="tickLog"><tr><td colspan="5" class="empty">Connect to load live ticks</td></tr></tbody></table></div></div>
+</div>
+<footer class="foot">V Analysis V4 · Independent analytical tool. Digit outcomes are uncertain. Past frequencies and model estimates do not predict or guarantee future results. Always test on a demo account and trade responsibly.</footer>
+</div>
+<script>
+(()=> {
+ const $=id=>document.getElementById(id);
+ let ws=null,subId=null,history=[],counts=Array(10).fill(0),trans=Array.from({length:10},()=>Array(10).fill(0)),lastDigit=null,pending=null,correct=0,evaluated=0,pipSize=2,log=[];
+ const MAX=500, RECENT=100;
+ function status(s,type=''){ $('status').textContent=s;$('dot').className='dot '+type; }
+ function fmt(n){return Number(n).toLocaleString();}
+ function digitOf(quote,pip){return Number(Number(quote).toFixed(pip).replace('.','').slice(-1));}
+ function closeSocket(){if(ws){try{if(subId)ws.send(JSON.stringify({forget:subId}));ws.close();}catch(e){} }ws=null;subId=null;}
+ function connect(){
+  closeSocket(); const app=$('appid').value.trim(); if(!/^\d+$/.test(app)){status('Enter a valid App ID','err');return;}
+  status('Connecting…');$('connect').disabled=true;
+  try{ws=new WebSocket('wss://ws.derivws.com/websockets/v3?app_id='+encodeURIComponent(app));}
+  catch(e){status('Connection failed','err');$('connect').disabled=false;return;}
+  ws.onopen=()=>{status('Connected · loading history','on');ws.send(JSON.stringify({ticks_history:$('symbol').value,adjust_start_time:1,count:MAX,end:'latest',style:'ticks',subscribe:1}));};
+  ws.onmessage=ev=>{let m;try{m=JSON.parse(ev.data)}catch(e){return}
+   if(m.error){status(m.error.message||'Deriv API error','err');$('connect').disabled=false;return}
+   if(m.msg_type==='history'&&m.history){pipSize=Number(m.pip_size??2);history=[];const prices=m.history.prices||[],times=m.history.times||[];prices.forEach((p,i)=>history.push({quote:Number(p),time:times[i]||Date.now()/1000,digit:digitOf(p,pipSize)}));rebuild();status('Live · '+$('symbol').selectedOptions[0].text,'on');$('connect').disabled=false;}
+   if(m.msg_type==='tick'&&m.tick){if(m.tick.pip_size!==undefined)pipSize=Number(m.tick.pip_size);if(m.subscription)subId=m.subscription.id;addTick(m.tick);}
+  };
+  ws.onerror=()=>{status('Network error — check connection','err');$('connect').disabled=false;};
+  ws.onclose=()=>{if($('connect').disabled===false)status('Disconnected');$('connect').disabled=false;subId=null;};
+ }
+ function rebuild(){counts=Array(10).fill(0);trans=Array.from({length:10},()=>Array(10).fill(0));history.slice(-MAX).forEach((t,i,a)=>{counts[t.digit]++;if(i>0)trans[a[i-1].digit][t.digit]++;});lastDigit=history.length?history[history.length-1].digit:null;pending=null;render();}
+ function addTick(t){
+  const quote=Number(t.quote),d=digitOf(quote,Number(t.pip_size??pipSize)),time=Number(t.epoch)||Date.now()/1000;
+  let outcome=null,previousPrediction=pending;
+  if(previousPrediction){evaluated++;if(previousPrediction.digit===d){correct++;outcome='HIT'}else outcome='MISS';}
+  if(lastDigit!==null)trans[lastDigit][d]++;counts[d]++;lastDigit=d;
+  history.push({quote,time,digit:d});if(history.length>MAX){const old=history.shift();counts[old.digit]=Math.max(0,counts[old.digit]-1);/* rebuild transition counts after rolling eviction */rebuildTransitions();}
+  pending=predict(d);
+  log.unshift({time,quote,digit:d,pred:previousPrediction?previousPrediction.digit:null,outcome});log=log.slice(0,30);
+  render();
+ }
+ function rebuildTransitions(){trans=Array.from({length:10},()=>Array(10).fill(0));for(let i=1;i<history.length;i++)trans[history[i-1].digit][history[i].digit]++;}
+ function predict(from){
+  const total=counts.reduce((a,b)=>a+b,0),row=from===null?Array(10).fill(0):trans[from],rowTotal=row.reduce((a,b)=>a+b,0);
+  let scores=Array.from({length:10},(_,d)=>{const freq=(counts[d]+1)/(total+10);const mark=(row[d]+1)/(rowTotal+10);return .55*freq+.45*mark;});
+  const sum=scores.reduce((a,b)=>a+b,0);scores=scores.map(v=>v/sum);let best=0;for(let i=1;i<10;i++)if(scores[i]>scores[best])best=i;
+  return {digit:best,prob:scores[best],scores};
+ }
+ function render(){
+  const total=history.length,model=lastDigit===null?null:predict(lastDigit);$('ticks').textContent=fmt(total);$('last').textContent=lastDigit===null?'—':lastDigit;$('quote').textContent=total?'Last quote: '+history[history.length-1].quote:'Waiting for tick';$('accuracy').textContent=evaluated?(100*correct/evaluated).toFixed(1)+'%':'—';$('samples').textContent=fmt(evaluated);$('scoreNote').textContent=evaluated?correct+' correct / '+(evaluated-correct)+' incorrect':'Needs evaluated predictions';
+  const max=Math.max(1,...counts);$('distribution').innerHTML=counts.map((c,d)=>'<div class="digit"><b>'+d+'</b><span>'+((total?100*c/total:0).toFixed(1))+'%</span><div class="bar"><i style="width:'+(100*c/max)+'%"></i></div><span>'+c+'</span></div>').join('');
+  $('recent').innerHTML=history.slice(-RECENT).map((t,i,a)=>'<span class="'+(i===a.length-1?'latest':'')+'">'+t.digit+'</span>').join('')||'<span class="muted">No ticks yet</span>';
+  $('predDigit').textContent=model?model.digit:'—';$('predTitle').textContent=model?'Highest estimated digit':'Waiting for data';$('predDetail').textContent=model?'Based on '+total+' observed ticks':'Connect to Deriv to begin analysis.';$('predProb').textContent=model?(model.prob*100).toFixed(1)+'%':'—';$('predBar').style.width=model?(model.prob*100)+'%':'0%';
+  $('freqTable').innerHTML=counts.map((c,d)=>'<tr><td><span class="digit-pill">'+d+'</span></td><td>'+c+'</td><td>'+(total?(100*c/total).toFixed(2):'0.00')+'%</td><td>'+(model?(100*model.scores[d]).toFixed(2):'—')+'%</td></tr>').join('');
+  $('tickLog').innerHTML=log.map(x=>'<tr><td>'+new Date(x.time*1000).toLocaleTimeString()+'</td><td>'+x.quote+'</td><td><span class="digit-pill">'+x.digit+'</span></td><td>'+(x.pred===null?'—':x.pred)+'</td><td class="'+(x.outcome==='HIT'?'hit':x.outcome==='MISS'?'miss':'')+'">'+(x.outcome||'—')+'</td></tr>').join('')||'<tr><td colspan="5" class="empty">Connect to load live ticks</td></tr>';
+ }
+ $('connect').addEventListener('click',connect);
+ $('reset').addEventListener('click',()=>{history=[];counts=Array(10).fill(0);trans=Array.from({length:10},()=>Array(10).fill(0));lastDigit=null;pending=null;correct=0;evaluated=0;log=[];render();status(ws&&ws.readyState===1?'Connected · stats reset':'Disconnected',ws&&ws.readyState===1?'on':'');});
+ $('symbol').addEventListener('change',()=>{if(ws&&ws.readyState===1)connect();});
+ window.addEventListener('beforeunload',closeSocket);
+ render();
+})();
+</script>
+</body>
+</html>
