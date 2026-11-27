@@ -24,11 +24,11 @@
  <div class="field"><label for="appid">Deriv App ID</label><input id="appid" inputmode="numeric" value="1089" placeholder="Your app ID"></div>
  <button class="btn primary" id="connect">Connect live</button><button class="btn secondary" id="reset">Reset stats</button><button class="btn secondary" id="export">Export CSV</button>
 </section>
-<p class="notice"><strong>Public market data only:</strong> no trading account token is requested. You can use your own registered Deriv application ID. Never enter your password or API token here.</p>
+<p class="notice"><strong>Public market data only:</strong> no trading account token is requested. Use an App ID from your own eligible registered Deriv application. <a href="https://developers.deriv.com/" target="_blank" rel="noopener" style="color:var(--blue)">Deriv developer dashboard / App ID help</a>. Never enter your password or API token here.</p>
 <section class="grid">
  <div class="panel metric"><div class="k">Ticks collected</div><div class="v" id="ticks">0</div><div class="small">Current session</div></div>
  <div class="panel metric"><div class="k">Last digit</div><div class="v" id="last">—</div><div class="small" id="quote">Waiting for tick</div></div>
- <div class="panel metric"><div class="k">Live prediction score</div><div class="v" id="accuracy">—</div><div class="small" id="scoreNote">Needs evaluated predictions</div></div>
+ <div class="panel metric"><div class="k">Observed hit rate</div><div class="v" id="accuracy">—</div><div class="small" id="scoreNote">Needs evaluated predictions</div></div>
  <div class="panel metric"><div class="k">Prediction samples</div><div class="v" id="samples">0</div><div class="small">Live next-tick outcomes</div></div>
 </section>
 <div class="main-grid">
