@@ -60,14 +60,28 @@ td{border-bottom-color:rgba(85,112,147,.17)}
 .feed-live{color:var(--green);font-weight:700}.feed-wait{color:var(--gold)}.feed-error{color:var(--red)}
 body .wrap>.grid,body .wrap>.main-grid{display:none}
 @media(max-width:700px){#scannerPanel{padding:12px}#scannerPanel table{min-width:720px}}
+
+.auth-panel{max-width:520px;margin:0 auto 18px}.auth-panel h2{margin:0 0 6px;font-size:18px}.auth-panel p{color:var(--muted);font-size:13px}.auth-grid{display:grid;gap:11px}.auth-actions{display:flex;gap:9px;flex-wrap:wrap}.auth-message{min-height:20px;font-size:13px;color:var(--gold)}#appContent[hidden],#authPanel[hidden]{display:none!important}#signOut{display:none}
 </style>
 </head>
 <body>
 <div class="wrap">
 <header class="top">
  <div class="brand"><div class="logo">V</div><div><h1>V Analysis <span style="color:var(--green)">V4</span></h1><div class="sub">DERIV LIVE DIGIT INTELLIGENCE</div></div></div>
- <div class="status"><i class="dot" id="dot"></i><span id="status">Disconnected</span></div>
+ <div style="display:flex;align-items:center;gap:10px"><button class="btn secondary" id="signOut" type="button">Sign out</button><div class="status"><i class="dot" id="dot"></i><span id="status">Disconnected</span></div></div>
 </header>
+<section class="panel auth-panel" id="authPanel">
+ <h2>Your V Analysis account</h2>
+ <p>Create an account or sign in to access the analysis dashboard. Use an email address you can verify.</p>
+ <div class="auth-grid">
+  <div class="field"><label for="authEmail">Email address</label><input id="authEmail" type="email" autocomplete="email" placeholder="you@example.com"></div>
+  <div class="field"><label for="authPassword">Password</label><input id="authPassword" type="password" autocomplete="current-password" placeholder="At least 8 characters"></div>
+  <div class="auth-actions"><button class="btn primary" id="signUp" type="button">Create account</button><button class="btn secondary" id="signIn" type="button">Sign in</button><button class="btn secondary" id="resetPassword" type="button">Reset password</button></div>
+  <div class="auth-message" id="authMessage" role="status" aria-live="polite"></div>
+ </div>
+ <p>Account security: use your own password, verify your email if asked, and never share your password. V Analysis does not request a Deriv trading password or API token.</p>
+</section>
+<div id="appContent" hidden>
 <section class="panel controls">
  <div class="field"><label for="symbol">Deriv market</label><select id="symbol"><option value="R_10">Volatility 10 Index</option><option value="R_25">Volatility 25 Index</option><option value="R_50">Volatility 50 Index</option><option value="R_75">Volatility 75 Index</option><option value="R_100">Volatility 100 Index</option><option value="1HZ10V">Volatility 10 (1s) Index</option><option value="1HZ25V">Volatility 25 (1s) Index</option><option value="1HZ50V">Volatility 50 (1s) Index</option><option value="1HZ75V">Volatility 75 (1s) Index</option><option value="1HZ100V">Volatility 100 (1s) Index</option></select></div>
  <div class="field"><label for="appid">Deriv App ID</label><input id="appid" inputmode="numeric" value="1089" placeholder="Your app ID"></div>
@@ -105,6 +119,7 @@ body .wrap>.grid,body .wrap>.main-grid{display:none}
  <div class="table-wrap" style="max-height:none"><table><thead><tr><th>Market</th><th>Ticks</th><th>Last digit</th><th>Predicted digit</th><th>Est. probability</th><th>Observed hit rate</th><th>Feed</th></tr></thead><tbody id="marketRows"></tbody></table></div>
  <p class="foot" id="scanNote">Connect to start monitoring all markets simultaneously.</p>
  </section>
+</div>
 <footer class="foot">V Analysis V4 · Free public-data analysis tool. Digit outcomes are uncertain. Past frequencies and model estimates do not guarantee future results. Always test on a demo account and trade responsibly.</footer>
 </div>
 <script>
@@ -276,5 +291,63 @@ body .wrap>.grid,body .wrap>.main-grid{display:none}
  render();
 })();
 </script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(()=> {
+ const URL="https://ferkgekcgyjyucxfxdow.supabase.co";
+ const PUBLIC_KEY="sb_publishable_rvSyqGtHJzu4SNuVk6uoOA_ys5qJwZz";
+ const authPanel=document.getElementById('authPanel');
+ const appContent=document.getElementById('appContent');
+ const msg=document.getElementById('authMessage');
+ const signOut=document.getElementById('signOut');
+ if(!window.supabase || !window.supabase.createClient){msg.textContent='Authentication library did not load. Check your internet and refresh.';return;}
+ const client=window.supabase.createClient(URL,PUBLIC_KEY);
+ const email=()=>document.getElementById('authEmail').value.trim();
+ const password=()=>document.getElementById('authPassword').value;
+ const say=t=>{msg.textContent=t;};
+ const show=user=>{
+  const signedIn=!!user;
+  authPanel.hidden=signedIn;
+  appContent.hidden=!signedIn;
+  signOut.style.display=signedIn?'inline-block':'none';
+  if(signedIn){say('');}
+ };
+ document.getElementById('signUp').addEventListener('click',async()=>{
+  if(!email()||password().length<8){say('Enter a valid email and a password with at least 8 characters.');return;}
+  say('Creating your account…');
+  const {data,error}=await client.auth.signUp({email:email(),password:password()});
+  if(error){say(error.message);return;}
+  if(data.session){show(data.user);say('Account created. You are signed in.');}
+  else say('Account created. Check your email for a verification link, then return here to sign in.');
+ });
+ document.getElementById('signIn').addEventListener('click',async()=>{
+  if(!email()||!password()){say('Enter your email and password.');return;}
+  say('Signing in…');
+  const {data,error}=await client.auth.signInWithPassword({email:email(),password:password()});
+  if(error){say(error.message);return;}
+  show(data.user);
+ });
+ document.getElementById('resetPassword').addEventListener('click',async()=>{
+  if(!email()){say('Enter your email address first.');return;}
+  say('Sending password reset email…');
+  const {error}=await client.auth.resetPasswordForEmail(email(),{redirectTo:location.origin+location.pathname});
+  say(error?error.message:'If this email has an account, a password reset link has been sent.');
+ });
+ signOut.addEventListener('click',async()=>{
+  signOut.disabled=true;
+  const {error}=await client.auth.signOut();
+  signOut.disabled=false;
+  if(error){say(error.message);return;}
+  show(null);say('You have signed out.');
+ });
+ client.auth.onAuthStateChange((_event,session)=>show(session?.user||null));
+ client.auth.getSession().then(({data,error})=>{
+  if(error){say(error.message);return;}
+  show(data.session?.user||null);
+ });
+})();
+</script>
+
 </body>
 </html>
