@@ -53,6 +53,13 @@ td{border-bottom-color:rgba(85,112,147,.17)}
 @media(max-width:800px){.wrap{padding:18px 15px}.top{padding-bottom:16px}.controls{padding:14px}.metric{min-height:104px}}
 @media(max-width:430px){.wrap{padding:13px 11px}.brand h1{font-size:20px}.logo{width:42px;height:42px}.metric .v{font-size:25px}.panel{border-radius:15px;padding:14px}}
 
+
+#scannerPanel table{min-width:760px}#scannerPanel td{padding:11px 8px}
+.market-name{font-weight:700;color:#e8f2ff}.market-symbol{display:block;color:var(--muted);font-size:10px}
+.pred-chip{display:inline-grid;place-items:center;min-width:29px;height:29px;padding:0 7px;border-radius:9px;background:#103b35;border:1px solid #237c68;color:#54edbb;font-size:16px;font-weight:850}
+.feed-live{color:var(--green);font-weight:700}.feed-wait{color:var(--gold)}.feed-error{color:var(--red)}
+body .wrap>.grid,body .wrap>.main-grid{display:none}
+@media(max-width:700px){#scannerPanel{padding:12px}#scannerPanel table{min-width:720px}}
 </style>
 </head>
 <body>
@@ -64,7 +71,7 @@ td{border-bottom-color:rgba(85,112,147,.17)}
 <section class="panel controls">
  <div class="field"><label for="symbol">Deriv market</label><select id="symbol"><option value="R_10">Volatility 10 Index</option><option value="R_25">Volatility 25 Index</option><option value="R_50">Volatility 50 Index</option><option value="R_75">Volatility 75 Index</option><option value="R_100">Volatility 100 Index</option><option value="1HZ10V">Volatility 10 (1s) Index</option><option value="1HZ25V">Volatility 25 (1s) Index</option><option value="1HZ50V">Volatility 50 (1s) Index</option><option value="1HZ75V">Volatility 75 (1s) Index</option><option value="1HZ100V">Volatility 100 (1s) Index</option></select></div>
  <div class="field"><label for="appid">Deriv App ID</label><input id="appid" inputmode="numeric" value="1089" placeholder="Your app ID"></div>
- <button class="btn primary" id="connect">Connect live</button><button class="btn secondary" id="reset">Reset stats</button><button class="btn secondary" id="export">Export CSV</button>
+ <button class="btn primary" id="connect">Scan all markets</button><button class="btn secondary" id="reset">Reset stats</button><button class="btn secondary" id="export">Export CSV</button>
 </section>
 <p class="notice"><strong>Public market data only:</strong> no trading account token is requested. Use an App ID from your own eligible registered Deriv application. <a href="https://developers.deriv.com/" target="_blank" rel="noopener" style="color:var(--blue)">Deriv developer dashboard / App ID help</a>. Never enter your password or API token here.</p>
 <section class="grid">
@@ -92,6 +99,12 @@ td{border-bottom-color:rgba(85,112,147,.17)}
 </div>
 
 
+<section class="panel" id="scannerPanel" style="margin:0 0 15px">
+ <div class="split"><h2 class="section-title" style="margin:0">All-market digit scanner</h2><span class="tag" id="scanCount">0 / 10 markets active</span></div>
+ <p class="notice" style="margin:8px 0 14px">Live digit estimates for all 10 synthetic indices. The highest-probability digit is shown for each market; estimates update as new ticks arrive.</p>
+ <div class="table-wrap" style="max-height:none"><table><thead><tr><th>Market</th><th>Ticks</th><th>Last digit</th><th>Predicted digit</th><th>Est. probability</th><th>Observed hit rate</th><th>Feed</th></tr></thead><tbody id="marketRows"></tbody></table></div>
+ <p class="foot" id="scanNote">Connect to start monitoring all markets simultaneously.</p>
+ </section>
 <footer class="foot">V Analysis V4 · Free public-data analysis tool. Digit outcomes are uncertain. Past frequencies and model estimates do not guarantee future results. Always test on a demo account and trade responsibly.</footer>
 </div>
 <script>
@@ -185,5 +198,83 @@ td{border-bottom-color:rgba(85,112,147,.17)}
 </script>
 
 
+
+<script>
+(()=> {
+ const symbols=[
+  ['R_10','Volatility 10'],['R_25','Volatility 25'],['R_50','Volatility 50'],['R_75','Volatility 75'],['R_100','Volatility 100'],
+  ['1HZ10V','Volatility 10 (1s)'],['1HZ25V','Volatility 25 (1s)'],['1HZ50V','Volatility 50 (1s)'],['1HZ75V','Volatility 75 (1s)'],['1HZ100V','Volatility 100 (1s)']
+ ];
+ const states={};symbols.forEach(([s,n])=>states[s]={symbol:s,name:n,history:[],counts:Array(10).fill(0),trans:Array.from({length:10},()=>Array(10).fill(0)),last:null,pending:null,correct:0,evaluated:0,status:'Waiting'});
+ let socket=null,ping=null,timeout=null,manual=false;
+ const $=id=>document.getElementById(id);
+ function digitOf(q,p){return Number(Number(q).toFixed(p).replace('.','').slice(-1));}
+ function predict(st){
+  const total=st.history.length, row=st.last===null?Array(10).fill(0):st.trans[st.last], rt=row.reduce((a,b)=>a+b,0);
+  const scores=st.counts.map((c,d)=>.55*((c+1)/(total+10))+.45*((row[d]+1)/(rt+10)));
+  const sum=scores.reduce((a,b)=>a+b,0);let best=0;
+  for(let i=1;i<10;i++)if(scores[i]>scores[best])best=i;
+  return {digit:best,prob:scores[best]/sum};
+ }
+ function rebuild(st){st.counts=Array(10).fill(0);st.trans=Array.from({length:10},()=>Array(10).fill(0));st.history.forEach((x,i)=>{st.counts[x.digit]++;if(i)st.trans[st.history[i-1].digit][x.digit]++;});st.last=st.history.length?st.history[st.history.length-1].digit:null;}
+ function render(){
+  let active=0;
+  $('marketRows').innerHTML=symbols.map(([s])=>{
+   const st=states[s],p=st.last===null?null:predict(st);if(st.status==='Live')active++;
+   return '<tr><td><span class="market-name">'+st.name+'</span><span class="market-symbol">'+s+'</span></td><td>'+st.history.length+'</td><td>'+(st.last===null?'—':'<span class="digit-pill">'+st.last+'</span>')+'</td><td>'+(p?'<span class="pred-chip">'+p.digit+'</span>':'—')+'</td><td>'+(p?(p.prob*100).toFixed(1)+'%':'—')+'</td><td>'+(st.evaluated?(100*st.correct/st.evaluated).toFixed(1)+'%':'—')+'</td><td class="'+(st.status==='Live'?'feed-live':st.status==='Error'?'feed-error':'feed-wait')+'">'+st.status+'</td></tr>';
+  }).join('');
+  $('scanCount').textContent=active+' / 10 markets active';
+ }
+ function closeAll(){if(ping)clearInterval(ping);if(timeout)clearTimeout(timeout);ping=timeout=null;if(socket){try{socket.close();}catch(e){}}socket=null;}
+ function connectAll(){
+  manual=true;closeAll();const app=$('appid').value.trim();
+  if(!/^\d+$/.test(app)){$('status').textContent='Enter a valid numeric App ID';$('dot').className='dot err';return;}
+  symbols.forEach(([s])=>{states[s].status='Connecting';});
+  render();$('connect').disabled=true;$('status').textContent='Connecting to Deriv…';$('dot').className='dot';
+  try{socket=new WebSocket('wss://ws.derivws.com/websockets/v3?app_id='+encodeURIComponent(app));}catch(e){$('status').textContent='Could not start connection';$('dot').className='dot err';$('connect').disabled=false;return;}
+  const ws=socket;
+  timeout=setTimeout(()=>{if(socket===ws&&ws.readyState!==1){$('status').textContent='Connection timed out — check internet or App ID';$('dot').className='dot err';$('connect').disabled=false;symbols.forEach(([s])=>states[s].status='Error');render();try{ws.close();}catch(e){}}},15000);
+  ws.onopen=()=>{
+   if(socket!==ws)return;clearTimeout(timeout);timeout=null;
+   $('status').textContent='Connected — loading 10 markets';$('dot').className='dot on';
+   symbols.forEach(([s],i)=>setTimeout(()=>{if(socket===ws&&ws.readyState===1)ws.send(JSON.stringify({ticks_history:s,adjust_start_time:1,count:300,end:'latest',style:'ticks',subscribe:1,req_id:100+i}));},i*180));
+   ping=setInterval(()=>{if(socket===ws&&ws.readyState===1)ws.send(JSON.stringify({ping:1}));},30000);
+  };
+  ws.onmessage=e=>{
+   if(socket!==ws)return;let m;try{m=JSON.parse(e.data)}catch(_){return;}
+   if(m.error){
+    const idx=Number(m.req_id)-100;if(idx>=0&&idx<symbols.length){states[symbols[idx][0]].status='Error';render();}
+    $('scanNote').textContent='Deriv returned an API error: '+m.error.message;return;
+   }
+   if(m.msg_type==='history'&&m.history){
+    const idx=Number(m.req_id)-100;if(idx<0||idx>=symbols.length)return;
+    const st=states[symbols[idx][0]],prices=m.history.prices||[],times=m.history.times||[],pip=Number(m.pip_size??2);
+    st.history=prices.map((q,i)=>({quote:Number(q),time:Number(times[i])||Date.now()/1000,digit:digitOf(q,pip)})).slice(-300);rebuild(st);st.status='Live';render();
+    $('status').textContent='Live monitoring — all 10 markets';$('dot').className='dot on';$('scanNote').textContent='Each market is analysed independently. A prediction appears after historical ticks load; live updates follow automatically.';
+    $('connect').disabled=false;
+   }
+   if(m.msg_type==='tick'&&m.tick){
+    const st=states[m.tick.symbol];if(!st)return;
+    const d=digitOf(m.tick.quote,Number(m.tick.pip_size??2));
+    if(st.pending!==null){st.evaluated++;if(st.pending===d)st.correct++;}
+    if(st.last!==null)st.trans[st.last][d]++;
+    st.counts[d]++;st.last=d;st.history.push({quote:Number(m.tick.quote),time:Number(m.tick.epoch)||Date.now()/1000,digit:d});
+    if(st.history.length>300){st.history.shift();rebuild(st);}
+    st.pending=predict(st).digit;st.status='Live';render();
+   }
+  };
+  ws.onerror=()=>{if(socket===ws){$('status').textContent='Network error — check connection';$('dot').className='dot err';}};
+  ws.onclose=ev=>{if(socket!==ws)return;if(ping)clearInterval(ping);ping=null;$('connect').disabled=false;symbols.forEach(([s])=>{if(states[s].status==='Live')states[s].status='Disconnected';});render();$('status').textContent='Disconnected (code '+ev.code+')';$('dot').className='dot err';$('scanNote').textContent='Connection closed. Check your internet and registered Deriv App ID, then try again.';};
+ }
+ $('connect').addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();connectAll();},true);
+ $('reset').addEventListener('click',e=>{
+  e.preventDefault();e.stopImmediatePropagation();
+  symbols.forEach(([s])=>{const st=states[s];st.history=[];st.counts=Array(10).fill(0);st.trans=Array.from({length:10},()=>Array(10).fill(0));st.last=null;st.pending=null;st.correct=0;st.evaluated=0;});
+  render();$('scanNote').textContent='Statistics reset. Live monitoring continues.'; 
+ },true);
+ $('symbol').disabled=true;$('symbol').title='All 10 markets are monitored together.';
+ render();
+})();
+</script>
 </body>
 </html>
