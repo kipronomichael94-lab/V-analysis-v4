@@ -249,7 +249,7 @@ body .wrap>.grid,body .wrap>.main-grid{display:none}
    if(m.msg_type==='history'&&m.history){
     const idx=Number(m.req_id)-100;if(idx<0||idx>=symbols.length)return;
     const st=states[symbols[idx][0]],prices=m.history.prices||[],times=m.history.times||[],pip=Number(m.pip_size??2);
-    st.history=prices.map((q,i)=>({quote:Number(q),time:Number(times[i])||Date.now()/1000,digit:digitOf(q,pip)})).slice(-300);rebuild(st);st.status='Live';render();
+    st.history=prices.map((q,i)=>({quote:Number(q),time:Number(times[i])||Date.now()/1000,digit:digitOf(q,pip)})).slice(-300);rebuild(st);st.pending=st.last===null?null:predict(st).digit;st.status='Live';render();
     $('status').textContent='Live monitoring — all 10 markets';$('dot').className='dot on';$('scanNote').textContent='Each market is analysed independently. A prediction appears after historical ticks load; live updates follow automatically.';
     $('connect').disabled=false;
    }
