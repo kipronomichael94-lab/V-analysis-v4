@@ -63,7 +63,7 @@
  function clearConnectionTimers(){if(keepAlive){clearInterval(keepAlive);keepAlive=null;}if(connectTimeout){clearTimeout(connectTimeout);connectTimeout=null;}}
  function closeSocket(){clearConnectionTimers();if(ws){try{if(subId&&ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify({forget:subId}));ws.close();}catch(e){} }ws=null;subId=null;}
  function connect(){
-  closeSocket(); const app=$('appid').value.trim(); if(!/^\\d+$/.test(app)){status('Enter a valid numeric App ID','err');return;}
+  closeSocket(); const app=$('appid').value.trim(); if(!/^\d+$/.test(app)){status('Enter a valid numeric App ID','err');return;}
   status('Connecting to Deriv…');$('connect').disabled=true;
   try{ws=new WebSocket('wss://ws.derivws.com/websockets/v3?app_id='+encodeURIComponent(app));}
   catch(e){status('Could not start WebSocket: '+(e.message||'browser error'),'err');$('connect').disabled=false;return;}
