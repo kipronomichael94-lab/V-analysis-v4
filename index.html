@@ -222,7 +222,7 @@ body .wrap>.grid,body .wrap>.main-grid{display:none}
   ['1HZ10V','Volatility 10 (1s)'],['1HZ25V','Volatility 25 (1s)'],['1HZ50V','Volatility 50 (1s)'],['1HZ75V','Volatility 75 (1s)'],['1HZ100V','Volatility 100 (1s)']
  ];
  const states={};symbols.forEach(([s,n])=>states[s]={symbol:s,name:n,history:[],counts:Array(10).fill(0),trans:Array.from({length:10},()=>Array(10).fill(0)),last:null,pending:null,correct:0,evaluated:0,status:'Waiting'});
- let socket=null,ping=null,timeout=null,manual=false;
+ let socket=null,ping=null,timeout=null,manual=false,reconnectTimer=null,reconnectAttempts=0,shouldReconnect=true;
  const $=id=>document.getElementById(id);
  function digitOf(q,p){return Number(Number(q).toFixed(p).replace('.','').slice(-1));}
  function predict(st){
@@ -241,7 +241,8 @@ body .wrap>.grid,body .wrap>.main-grid{display:none}
   }).join('');
   $('scanCount').textContent=active+' / 10 markets active';
  }
- function closeAll(){if(ping)clearInterval(ping);if(timeout)clearTimeout(timeout);ping=timeout=null;if(socket){try{socket.close();}catch(e){}}socket=null;}
+ function closeAll(){if(ping)clearInterval(ping);if(timeout)clearTimeout(timeout);if(reconnectTimer)clearTimeout(reconnectTimer);ping=timeout=reconnectTimer=null;if(socket){const old=socket;socket=null;try{old.close();}catch(e){}}}
+ function scheduleReconnect(){if(!shouldReconnect||reconnectTimer||reconnectAttempts>=5||!navigator.onLine)return;const delay=Math.min(1500*Math.pow(2,reconnectAttempts),20000);reconnectAttempts++;$('status').textContent='Connection lost — retry '+reconnectAttempts+'/5 in '+Math.ceil(delay/1000)+'s';$('dot').className='dot err';reconnectTimer=setTimeout(()=>{reconnectTimer=null;connectAll();},delay);}
  function connectAll(){
   manual=true;closeAll();const app=$('appid').value.trim();
   if(!/^\d+$/.test(app)){$('status').textContent='Enter a valid numeric App ID';$('dot').className='dot err';return;}
@@ -251,7 +252,7 @@ body .wrap>.grid,body .wrap>.main-grid{display:none}
   const ws=socket;
   timeout=setTimeout(()=>{if(socket===ws&&ws.readyState!==1){$('status').textContent='Connection timed out — check internet or App ID';$('dot').className='dot err';$('connect').disabled=false;symbols.forEach(([s])=>states[s].status='Error');render();try{ws.close();}catch(e){}}},15000);
   ws.onopen=()=>{
-   if(socket!==ws)return;clearTimeout(timeout);timeout=null;
+   if(socket!==ws)return;clearTimeout(timeout);timeout=null;reconnectAttempts=0;
    $('status').textContent='Connected — loading 10 markets';$('dot').className='dot on';
    symbols.forEach(([s],i)=>setTimeout(()=>{if(socket===ws&&ws.readyState===1)ws.send(JSON.stringify({ticks_history:s,adjust_start_time:1,count:300,end:'latest',style:'ticks',subscribe:1,req_id:100+i}));},i*180));
    ping=setInterval(()=>{if(socket===ws&&ws.readyState===1)ws.send(JSON.stringify({ping:1}));},30000);
@@ -280,9 +281,11 @@ body .wrap>.grid,body .wrap>.main-grid{display:none}
    }
   };
   ws.onerror=()=>{if(socket===ws){$('status').textContent='Network error — check connection';$('dot').className='dot err';}};
-  ws.onclose=ev=>{if(socket!==ws)return;if(ping)clearInterval(ping);ping=null;$('connect').disabled=false;symbols.forEach(([s])=>{if(states[s].status==='Live')states[s].status='Disconnected';});render();$('status').textContent='Disconnected (code '+ev.code+')';$('dot').className='dot err';$('scanNote').textContent='Connection closed. Check your internet and registered Deriv App ID, then try again.';};
+  ws.onclose=ev=>{if(socket!==ws)return;if(ping)clearInterval(ping);ping=null;$('connect').disabled=false;symbols.forEach(([s])=>{if(states[s].status==='Live'||states[s].status==='Connecting')states[s].status='Disconnected';});render();$('status').textContent='Disconnected (code '+ev.code+')';$('dot').className='dot err';$('scanNote').textContent='Connection closed. The scanner will retry automatically when possible.';if(ev.code!==1000)scheduleReconnect();};
  }
- $('connect').addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();connectAll();},true);
+ $('connect').addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();reconnectAttempts=0;shouldReconnect=true;connectAll();},true);
+ window.addEventListener('online',()=>{if(!socket||socket.readyState===WebSocket.CLOSED){reconnectAttempts=0;shouldReconnect=true;connectAll();}});
+ window.addEventListener('offline',()=>{$('status').textContent='Internet offline — waiting to reconnect';$('dot').className='dot err';});
  $('reset').addEventListener('click',e=>{
   e.preventDefault();e.stopImmediatePropagation();
   symbols.forEach(([s])=>{const st=states[s];st.history=[];st.counts=Array(10).fill(0);st.trans=Array.from({length:10},()=>Array(10).fill(0));st.last=null;st.pending=null;st.correct=0;st.evaluated=0;});
